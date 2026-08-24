@@ -3,6 +3,9 @@
 Reads proof-of-personhood state from the Polkadot Products Devnet and explains
 what it means.
 
+**Live on the devnet → https://whoisaperson.dev-net.dot.li** (published as
+`whoisaperson.dot`)
+
 ```bash
 npm install
 npm run build && npm run preview      # http://localhost:4174
