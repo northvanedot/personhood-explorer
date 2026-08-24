@@ -3,7 +3,7 @@
 Reads proof-of-personhood state from the Polkadot Products Devnet and explains
 what it means.
 
-**Live on the devnet → https://whoisaperson.dev-net.dot.li** (published as
+**Live on the devnet → https://whoisaperson.dev-dot.li** (published as
 `whoisaperson.dot`)
 
 ```bash
