@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Personhood Explorer — Polkadot Products Devnet</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fbfbfa;
+        --panel: #ffffff;
+        --ink: #14140f;
+        --muted: #6b6b63;
+        --line: rgba(20, 20, 15, 0.12);
+        --accent: #2a78d6;
+        --none: #8a8a80;
+        --lite: #c98500;
+        --full: #199e70;
+        --warn: #d95926;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16161a;
+          --panel: #1e1e22;
+          --ink: #f2f2ee;
+          --muted: #a0a099;
+          --line: rgba(255, 255, 255, 0.13);
+          --accent: #6ba6ea;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; background: var(--bg); color: var(--ink);
+        font: 15px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+        padding: 2.5rem 1.25rem 4rem;
+      }
+      main { max-width: 720px; margin: 0 auto; }
+      h1 { font-size: 1.5rem; font-weight: 600; margin: 0 0 .35rem; letter-spacing: -0.01em; }
+      .sub { color: var(--muted); margin: 0 0 2rem; font-size: .93rem; }
+      .panel {
+        background: var(--panel); border: 1px solid var(--line);
+        border-radius: 12px; padding: 1.15rem 1.25rem; margin-bottom: 1.1rem;
+      }
+      label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: .35rem; }
+      input {
+        width: 100%; padding: .6rem .7rem; font-family: var(--mono); font-size: .87rem;
+        background: transparent; color: var(--ink);
+        border: 1px solid var(--line); border-radius: 8px;
+      }
+      input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+      .row { display: flex; gap: .7rem; align-items: flex-end; flex-wrap: wrap; }
+      .row > div:first-child { flex: 1 1 22rem; }
+      .row > div:nth-child(2) { flex: 0 1 8rem; }
+      button {
+        padding: .6rem 1.15rem; font-size: .9rem; font-weight: 500; cursor: pointer;
+        background: var(--accent); color: #fff; border: 0; border-radius: 8px;
+      }
+      button:disabled { opacity: .55; cursor: default; }
+      .hint { font-size: .8rem; color: var(--muted); margin-top: .6rem; }
+      .hint code { font-family: var(--mono); font-size: .95em; }
+      .badge {
+        display: inline-block; padding: .18rem .6rem; border-radius: 999px;
+        font-size: .78rem; font-weight: 600; color: #fff; letter-spacing: .02em;
+      }
+      .badge.none { background: var(--none); }
+      .badge.lite { background: var(--lite); }
+      .badge.full { background: var(--full); }
+      .badge.reserved { background: var(--accent); }
+      dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: .45rem 1rem; }
+      dt { color: var(--muted); font-size: .84rem; }
+      dd { margin: 0; font-family: var(--mono); font-size: .82rem; word-break: break-all; }
+      .chain-label {
+        font-size: .74rem; text-transform: uppercase; letter-spacing: .06em;
+        color: var(--muted); margin: 0 0 .5rem; font-weight: 600;
+      }
+      #peopleRows { margin-top: 1.1rem; padding-top: 1.1rem; border-top: 1px solid var(--line); }
+      .verdict { border-left: 3px solid var(--line); padding: .1rem 0 .1rem .85rem; margin-top: 1.1rem; }
+      .verdict.warn { border-left-color: var(--warn); }
+      .verdict.ok { border-left-color: var(--full); }
+      .verdict p { margin: 0 0 .5rem; font-size: .92rem; }
+      .verdict p:last-child { margin-bottom: 0; }
+      .verdict a { color: var(--accent); }
+      .err { color: var(--warn); font-size: .9rem; }
+      table { width: 100%; border-collapse: collapse; font-size: .87rem; }
+      th, td { text-align: left; padding: .4rem .5rem; border-bottom: 1px solid var(--line); }
+      th { color: var(--muted); font-weight: 500; font-size: .8rem; }
+      td:first-child { font-family: var(--mono); }
+      footer { color: var(--muted); font-size: .8rem; margin-top: 2rem; line-height: 1.7; }
+      footer a { color: var(--accent); }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Personhood Explorer</h1>
+      <p class="sub">Proof-of-personhood state on the Polkadot Products Devnet. Read-only.</p>
+
+      <div class="panel">
+        <div class="row">
+          <div>
+            <label for="address">Account — username (<code>.01</code>), SS58, or EVM address</label>
+            <input id="address" placeholder="northvane · 5Equii87… · 0x88cf…" spellcheck="false" />
+          </div>
+          <div>
+            <label for="context">Context</label>
+            <input id="context" value="dotns" spellcheck="false" />
+          </div>
+          <button id="check">Check</button>
+        </div>
+        <p class="hint">
+          Aliases are per-context — a different context gives the same person a
+          different, unlinkable one.
+        </p>
+        <p id="error" class="err hidden"></p>
+      </div>
+
+      <section id="result" class="panel hidden" aria-live="polite">
+        <div style="margin-bottom: 1rem">
+          <span id="tier" class="badge none">None</span>
+          <span id="tierBlurb" style="color: var(--muted); font-size: .87rem; margin-left: .5rem"></span>
+        </div>
+        <p class="chain-label">Asset Hub — what contracts see</p>
+        <dl>
+          <dt>Username</dt><dd id="outUsername">—</dd>
+          <dt>SS58</dt><dd id="outSs58">—</dd>
+          <dt>EVM</dt><dd id="outEvm">—</dd>
+          <dt>Context</dt><dd id="outContext">—</dd>
+          <dt>Contextual alias</dt><dd id="outAlias">—</dd>
+        </dl>
+        <div id="peopleRows" class="hidden">
+          <p class="chain-label">People chain — where registration lives</p>
+          <dl>
+            <dt>Registered</dt><dd id="outRegistered">—</dd>
+            <dt>Ring VRF key</dt><dd id="outRing">—</dd>
+            <dt>Alias bound</dt><dd id="outAliasBound">—</dd>
+          </dl>
+        </div>
+        <div id="verdict" class="verdict"></div>
+      </section>
+
+      <section class="panel">
+        <label for="label">DotNS name — can this <code>.dot</code> be claimed?</label>
+        <div class="row">
+          <div><input id="label" placeholder="whoisaperson" spellcheck="false" /></div>
+          <button id="checkName">Check name</button>
+        </div>
+        <p class="hint">
+          A separate registry from usernames — a <code>.01</code> username gives no claim
+          on the matching <code>.dot</code>. Short names need personhood, not money.
+        </p>
+        <div id="nameResult" class="hidden" style="margin-top: 1rem">
+          <table>
+            <tbody>
+              <tr><th>Registration</th><td id="nameStatus"></td></tr>
+              <tr><th>Tier needed</th><td id="nameRequires"></td></tr>
+              <tr><th>Price</th><td id="namePrice"></td></tr>
+              <tr><th>Reserved</th><td id="nameReservation"></td></tr>
+            </tbody>
+          </table>
+          <div id="nameVerdict" class="verdict"></div>
+        </div>
+        <p id="nameError" class="err hidden" style="margin-top: .8rem"></p>
+      </section>
+
+      <footer>
+        Reads the <code>IPersonhood</code> precompile and <code>PopRules</code> on Asset
+        Hub, and <code>PeopleLite</code> on the People chain.
+        <br />
+        Devnet only — unaudited prototype, state may reset. Lookups go to public RPCs,
+        which can log them.
+      </footer>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
