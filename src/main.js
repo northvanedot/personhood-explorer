@@ -543,7 +543,19 @@ async function checkName() {
     };
     $("nameStatus").textContent = owner ? `registered — ${owner}` : "unregistered";
     $("nameRequires").textContent = `${TIERS[requires]?.label ?? requires} — ${REQUIREMENT[requires] ?? message}`;
-    $("namePrice").textContent = price === null ? "—" : `${price} PAS`;
+    // PopRules returns 0 for every label that is not open to all, and 10 PAS for
+    // every label that is. A bare "0 PAS" beside "nobody can claim this" reads
+    // like a broken field, when it is the contract making the same point the
+    // verdict does: the barrier is personhood, not money. Verified across 6, 7,
+    // 8 and 10 character labels.
+    $("namePrice").textContent =
+      price === null
+        ? "—"
+        : price === 0 && requires === 3
+          ? "0 PAS — the barrier here is governance, not money"
+          : price === 0 && requires > 0
+            ? "0 PAS — the barrier here is personhood, not money"
+            : `${price} PAS`;
     $("nameReservation").textContent = reservation.owner
       ? `${reservation.owner}${reservation.expiry ? ` until ${new Date(reservation.expiry * 1000).toISOString().slice(0, 10)}` : ""}`
       : "nobody";
