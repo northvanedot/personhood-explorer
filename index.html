@@ -98,6 +98,36 @@
       #card dd { line-height: 1.5; }
       #peopleNote { font-size: .84rem; color: var(--muted); margin: 1.1rem 0 0;
         padding-top: 1.1rem; border-top: 1px solid var(--line); }
+      /* "What this establishes" — deliberately quiet next to the result it
+         qualifies, but always present rather than behind a disclosure. */
+      .establishes {
+        font-size: .84rem; color: var(--muted); line-height: 1.55;
+        margin: .5rem 0 0; padding-left: .7rem;
+        border-left: 2px solid var(--line);
+      }
+      .establishes strong { color: var(--ink); font-weight: 600; }
+      .establishes code { font-family: var(--mono); font-size: .95em; }
+      /* The long form ships with the bundle rather than living behind a link, so
+         a given CID carries both the code and what it claims about the code.
+         Static markup: no runtime cost, and prose gzips well. */
+      details.longform { margin: .55rem 0 0; }
+      details.longform > summary {
+        cursor: pointer; font-size: .8rem; color: var(--accent);
+        list-style: none; padding: .15rem 0; width: fit-content;
+      }
+      details.longform > summary::-webkit-details-marker { display: none; }
+      details.longform > summary::before { content: "▸ "; font-size: .9em; }
+      details.longform[open] > summary::before { content: "▾ "; }
+      details.longform > div {
+        font-size: .83rem; color: var(--muted); line-height: 1.6;
+        margin-top: .5rem; padding-left: .7rem; border-left: 2px solid var(--line);
+      }
+      details.longform p { margin: 0 0 .6rem; }
+      details.longform p:last-child { margin-bottom: 0; }
+      details.longform strong { color: var(--ink); font-weight: 600; }
+      details.longform code { font-family: var(--mono); font-size: .95em; }
+      details.longform table { margin: .4rem 0 .7rem; font-size: .8rem; }
+      details.longform td, details.longform th { padding: .3rem .45rem; vertical-align: top; }
       .hidden { display: none; }
     </style>
   </head>
@@ -119,8 +149,10 @@
           <button id="check">Check</button>
         </div>
         <p class="hint">
-          Aliases are per-context — a different context gives the same person a
-          different, unlinkable one.
+          The context scopes the alias. By design a different context gives the same person
+          a different alias that can't be linked to this one — but that is how the pallet is
+          written, not something anyone has seen work here: no alias can be bound on this
+          devnet. An account that binds one is also publicly tied to it.
         </p>
         <p id="error" class="err hidden"></p>
       </div>
@@ -142,10 +174,36 @@
       </section>
 
       <section id="result" class="panel hidden" aria-live="polite">
-        <div style="margin-bottom: 1rem">
+        <div style="margin-bottom: .6rem">
           <span id="tier" class="badge none">None</span>
           <span id="tierBlurb" style="color: var(--muted); font-size: .87rem; margin-left: .5rem"></span>
         </div>
+        <p id="tierEstablishes" class="establishes"></p>
+        <details class="longform">
+          <summary>What the tier does and does not establish</summary>
+          <div>
+            <p>
+              <em>Read from the pallet source.</em> The tier is <strong>not</strong> read off
+              registration. The precompile calls
+              <code>personhood_info(account, context)</code>, which returns nothing unless the
+              account holds an <em>alias in that context</em>. The tier then comes from which
+              ring collection that alias belongs to — <code>PEOPLE_LITE_IDENTIFIER</code> → Lite,
+              <code>PEOPLE_IDENTIFIER</code> → Full.
+            </p>
+            <p>
+              <code>alias-accounts</code> documents <code>AliasFee</code> as
+              <em>"<code>None</code> fails every registration with <code>AliasFeeUnset</code>"</em>,
+              and reads it on entry to <code>set_paid_alias_account</code>.
+              It is unset on this devnet.
+             
+            </p>
+            <p>
+              <strong>So no alias can be bound, and every account reads None — Lite and Full are
+              both unreachable here, not just Full.</strong> A None on this devnet says nothing
+              about the account at all.
+            </p>
+          </div>
+        </details>
         <p class="chain-label">Asset Hub — what contracts see</p>
         <dl>
           <dt>Username</dt><dd id="outUsername">—</dd>
@@ -158,9 +216,78 @@
           <p class="chain-label">People chain — where registration lives</p>
           <dl>
             <dt>Registered</dt><dd id="outRegistered">—</dd>
+            <dt>Method</dt><dd id="outMethod">—</dd>
             <dt>Ring VRF key</dt><dd id="outRing">—</dd>
             <dt>Alias bound</dt><dd id="outAliasBound">—</dd>
           </dl>
+          <p id="peopleEstablishes" class="establishes hidden"></p>
+          <details class="longform">
+            <summary>What registration does and does not establish</summary>
+            <div>
+              <p>
+                <em>Read from the pallet source.</em> <code>PeopleLite.LitePeople</code> has two
+                entry paths, and they are not equivalent.
+              </p>
+              <table>
+                <tbody>
+                  <tr>
+                    <th><code>UniqueDevice</code></th>
+                    <td>
+                      An attester holding an allowance granted by
+                      <code>AttestationAllowanceManager</code> submits <code>attest</code>. The
+                      chain verifies the candidate's signature, a ring-VRF proof of key
+                      ownership, and that the key is not already in the collection.
+                    </td>
+                  </tr>
+                  <tr>
+                    <th><code>Fee</code></th>
+                    <td>
+                      <code>register_with_fee</code>: the candidate pays and proves key
+                      ownership. <strong>No attester and no uniqueness check of any
+                      kind.</strong>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p>
+                In neither case does the chain establish <em>a human</em>. Under
+                <code>UniqueDevice</code>, one person per record is the <strong>attester's</strong>
+                claim — the chain checked signatures, not people. Under <code>Fee</code> nobody
+                claims it: nothing stops one person registering repeatedly with fresh accounts
+                and fresh keys, paying each time.
+              </p>
+              <p>
+                On this devnet all <strong>275</strong> lite people were registered by
+                <code>UniqueDevice</code> and none by <code>Fee</code>
+               , so the fee path is live code with no instances
+                here.
+              </p>
+            </div>
+          </details>
+          <p id="aliasEstablishes" class="establishes hidden"></p>
+          <details class="longform">
+            <summary>What an alias would establish</summary>
+            <div>
+              <p>
+                Per the pallet docs, an alias is the same person across sessions
+                <strong>within one context</strong>, and a different context yields a different
+                alias that cannot be linked to it. That is the privacy property the design rests
+                on — and all of it is <em>read from the pallet source</em>.
+              </p>
+              <p>
+                <strong>This app has never observed one</strong>, because none can exist here.
+                Nothing below has been seen working on this devnet.
+              </p>
+              <p>
+                One limit is structural rather than cryptographic:
+                <code>AccountToAlias</code> is a public map holding <strong>one alias per
+                account</strong>. The unlinkability is between
+                aliases in <em>different contexts</em>, not between an account and its alias — so
+                using one account across two contexts defeats the property the alias exists to
+                provide.
+              </p>
+            </div>
+          </details>
         </div>
         <p id="peopleNote" class="hidden"></p>
         <div id="verdict" class="verdict"></div>
@@ -196,6 +323,8 @@
         <br />
         Devnet only — unaudited prototype, state may reset. Lookups go to public RPCs,
         which can log them.
+        <br />
+        What each result establishes is stated inline above, and ships with this build.
       </footer>
     </main>
     <script type="module" src="/src/main.js"></script>

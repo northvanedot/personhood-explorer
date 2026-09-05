@@ -206,7 +206,20 @@ export async function accountIdForEvm(evmAddress, urls = ASSET_HUB_RPCS) {
 export async function litePeople(publicKey, urls = PEOPLE_RPCS) {
   const raw = await getStorage("PeopleLite", "LitePeople", publicKey, urls);
   if (!raw) return null;
-  return { raw, ringVrfKey: "0x" + raw.replace(/^0x/, "").slice(0, 64) };
+  const body = raw.replace(/^0x/, "");
+  // `LitePersonInfo` is `{ ring_vrf_key: [u8;32], method: RecognitionMethod }`,
+  // and `RecognitionMethod` is a SCALE enum: 0x00 `UniqueDevice(AccountId32)`,
+  // 0x01 `Fee`. So the whole record is already in hand — 65 bytes for the first,
+  // 33 for the second — and reading the method costs no extra request.
+  //
+  // It is worth reading because the two mean very different things: `Fee` is a
+  // payment with no uniqueness check at all.
+  const tag = body.slice(64, 66);
+  const method =
+    tag === "00" ? { kind: "device", attester: "0x" + body.slice(66) }
+    : tag === "01" ? { kind: "fee" }
+    : { kind: "unknown", tag };
+  return { raw, ringVrfKey: "0x" + body.slice(0, 64), method };
 }
 
 /** PeopleLite.AccountToAlias — presence means an alias is bound for this account. */

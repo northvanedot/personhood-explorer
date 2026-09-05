@@ -57,8 +57,62 @@ function field(value, none) {
   return esc(Array.isArray(value) ? value.join(", ") : String(value));
 }
 
-const ISSUE_3 =
-  "https://github.com/Polkadot-Community-Foundation/polkadot-app-docs/issues/3";
+/**
+ * What a result actually establishes — and what it does not.
+ *
+ * A personhood result is routinely read as stronger than it is, so each state
+ * gets a claim of its own. Every line below is from the pallet source
+ * (`people-lite`, `alias-accounts`) or the precompile, not from the tier name.
+ *
+ * The long form is in the README; these are the one-liners.
+ */
+/** Registration on the People chain. `method` decides what was actually checked. */
+function establishesRegistration(method) {
+  if (method?.kind === "fee") {
+    return `Registered by <strong>paying the fee</strong> — <code>register_with_fee</code>. The chain checked that this ring-VRF key is unused and that the caller owns it. <strong>Nothing about a person was checked at all</strong>, so this establishes a paid registration, not a human.`;
+  }
+  if (method?.kind === "device") {
+    return `An attester authorised by governance vouched for a unique device, and the chain checked that this ring-VRF key is unused in the collection. <strong>The chain verified signatures, not a person</strong> — that one human holds one record is the attester's claim, not something proved here.`;
+  }
+  return `Registered, but by a method this app does not recognise, so <strong>we can't tell you what it establishes</strong>.`;
+}
+
+/**
+ * The tier the precompile reports.
+ *
+ * Status is read off an *alias* record, not off registration — `personhood_info`
+ * returns nothing when the account has no alias in the context, and the tier is
+ * then derived from which collection that alias belongs to. With `AliasFee`
+ * unset no alias can be bound, so on this devnet **every** tier above None is
+ * unreachable, not just Full.
+ */
+function establishesTier(status, feeSet) {
+  if (status === 0) {
+    return feeSet === false
+      ? `The tier comes from an <em>alias</em> record, not from registration. <code>AliasFee</code> is unset chain-wide, so no account can bind one — <strong>None is the only tier reachable on this devnet</strong>, for everyone. It does not mean this account was rejected.`
+      : `No alias bound in this context, so the precompile reports None. That is a statement about this account in this context, <strong>not about the person</strong>.`;
+  }
+  if (status === 1) {
+    return `Lite — the alias belongs to the People Lite collection. That inherits whatever the lite registration checked, which may be only a paid fee. See the People-chain row for which.`;
+  }
+  if (status === 2) {
+    return `Full — the alias belongs to the People collection, the tier backed by proof-of-ink rather than a device attestation.`;
+  }
+  return `Tier ${esc(String(status))} is not one this app knows, so <strong>we can't tell you what it establishes</strong>.`;
+}
+
+/**
+ * What a bound alias would mean. Marked as unverified on purpose: no alias can
+ * exist on this devnet, so none of it has been observed here.
+ */
+const ESTABLISHES_ALIAS =
+  `Per the pallet docs, an alias is <strong>the same person across sessions within one context</strong>, and a different context yields a different alias that cannot be linked to it. <strong>Unverified here</strong> — no alias can be bound on this devnet, so this app has never seen one. Note also that <code>AccountToAlias</code> holds one alias per account and is public, so an account that binds one is publicly tied to it.`;
+
+// `AliasFee` is chain-wide state, not per-account, so one read serves every
+// lookup in the session — and it is what lets the name checker say that a gated
+// name is unclaimable rather than merely gated.
+let aliasFeePromise = null;
+const aliasFeeSetOnce = () => (aliasFeePromise ??= aliasFeeSet().catch(() => null));
 
 // Remembered from the last account lookup so the name checker can say whether
 // *that* account could actually claim the name, rather than leaving the user to
@@ -98,7 +152,7 @@ function explain({ status, aliasSet }, people, rawContext, feeSet) {
       `<strong>Registered person</strong> on the People chain — ring-VRF key present.`,
       people.aliasBound
         ? `Alias bound there, but Asset Hub reports none for <code>${context}</code> — the ring root may not have propagated.`
-        : `No alias bound, so Asset Hub sees nobody. This is the <code>NoPersonhood</code> revert (<a href="${ISSUE_3}" target="_blank" rel="noopener">app-docs#3</a>).`,
+        : `No alias bound, so Asset Hub sees nobody. This is the state behind a <code>NoPersonhood</code> revert — the same condition every account on this devnet is in.`,
     ];
     if (feeSet === false) lines.push(CHAIN_BLOCKED);
     return { tone: "warn", lines };
@@ -129,7 +183,7 @@ function explain({ status, aliasSet }, people, rawContext, feeSet) {
     tone: "warn",
     lines: [
       `No record on <strong>either</strong> chain.`,
-      `Personhood binds to the account that owns the username — not a product or CLI account. Find it with <code>Resources.UsernameOwnerOf</code>.`,
+      `That is a fact about <em>this account</em>. It does <strong>not</strong> establish that the person behind it has no personhood — personhood binds to the account that owns the username, not to a product or CLI account. Find that one with <code>Resources.UsernameOwnerOf</code>.`,
     ],
   };
 }
@@ -306,7 +360,7 @@ async function check() {
 
     const [info, feeSet, dotCount] = await Promise.all([
       personhoodStatus(evm, context),
-      aliasFeeSet().catch(() => null),
+      aliasFeeSetOnce(),
       settle(dotNameCount(evm)),
     ]);
 
@@ -363,6 +417,7 @@ async function check() {
         unreachable,
         registered: !unreachable && Boolean(lp),
         ringVrfKey: (lp === FAILED ? null : lp?.ringVrfKey) ?? null,
+        method: lp === FAILED ? null : (lp?.method ?? null),
         aliasBound: alias !== FAILED && Boolean(alias),
       };
       usernames = Array.isArray(cardUsernames) ? cardUsernames : [];
@@ -401,6 +456,15 @@ async function check() {
           ? "yes — PeopleLite.LitePeople present"
           : "no record";
       $("outRing").textContent = people.ringVrfKey ?? "—";
+      $("outMethod").textContent = people.unreachable
+        ? "unknown"
+        : people.method?.kind === "device"
+          ? "attested — unique device"
+          : people.method?.kind === "fee"
+            ? "fee paid — no uniqueness check"
+            : people.registered
+              ? "unrecognised"
+              : "—";
       $("outAliasBound").textContent = people.unreachable
         ? "unknown"
         : people.aliasBound
@@ -413,6 +477,20 @@ async function check() {
       usernames[0] ??
       matchedUsername ??
       (typeof ss58 === "string" ? `${ss58.slice(0, 8)}…` : `${evm.slice(0, 8)}…`);
+
+    // Claims are built as HTML but contain no user input — `context` is the only
+    // free text that reaches them and it is escaped at the top of explain().
+    $("tierEstablishes").innerHTML = establishesTier(info.status, feeSet);
+    $("peopleEstablishes").innerHTML =
+      people && !people.unreachable && people.registered
+        ? establishesRegistration(people.method)
+        : "";
+    $("peopleEstablishes").classList.toggle(
+      "hidden",
+      !(people && !people.unreachable && people.registered),
+    );
+    $("aliasEstablishes").innerHTML = info.aliasSet ? ESTABLISHES_ALIAS : "";
+    $("aliasEstablishes").classList.toggle("hidden", !info.aliasSet);
 
     const { tone, lines } = explain(info, people, context, feeSet);
     $("verdict").className = `verdict ${tone}`;
@@ -445,11 +523,12 @@ async function checkName() {
   $("checkName").disabled = true;
   $("checkName").textContent = "Checking…";
   try {
-    const [{ requires, message }, reservation, owner, price] = await Promise.all([
+    const [{ requires, message }, reservation, owner, price, feeSet] = await Promise.all([
       classifyName(label),
       baseNameReservation(label),
       nameOwner(label),
       namePrice(label).catch(() => null),
+      aliasFeeSetOnce(),
     ]);
 
     // "Requires" is a pure function of the label's length and says nothing about
@@ -480,6 +559,17 @@ async function checkName() {
     } else if (requires === 3) {
       tone = "warn";
       verdict = `Governance-reserved — labels of 5 characters or fewer aren't open.`;
+    } else if (requires > 0 && feeSet === false) {
+      // The gate is a personhood tier, and no tier above None is reachable while
+      // AliasFee is unset. Saying only "needs personhood" sends people off to
+      // earn something nobody on this chain can have.
+      tone = "warn";
+      verdict =
+        `<strong>Nobody can claim this name on this devnet.</strong> It needs ` +
+        `<strong>${esc(TIERS[requires].label)}</strong> personhood, and personhood is read from a ` +
+        `contextual alias that no account can bind — <code>AliasAccounts.AliasFee</code> is unset ` +
+        `chain-wide. Not a gate you can pass: it needs a governance call to open. ` +
+        `<strong>9 characters or more has no personhood requirement.</strong>`;
     } else if (requires > 0 && lastTier !== null && requires > lastTier) {
       tone = "warn";
       verdict = `Needs <strong>${esc(TIERS[requires].label)}</strong> personhood — the account you checked above has <strong>${esc(TIERS[lastTier].label)}</strong>.`;

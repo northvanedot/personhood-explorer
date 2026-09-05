@@ -93,6 +93,77 @@ Listing the `.dot` names an account owns is not possible: the registrar answers
 individual names can be confirmed one at a time, and the app says plainly that
 the rest cannot be listed rather than implying the list is complete.
 
+## What a result establishes
+
+A personhood result is routinely read as stronger than it is. This is what each
+state actually proves, read off the pallet source rather than the tier name.
+
+Evidence tags: **[T]** tested against the live chain · **[S]** read from source ·
+**[?]** unverified.
+
+### "Registered" on the People chain
+
+`PeopleLite.LitePeople` has two entry paths, and they are not equivalent **[S]**:
+
+| Method | What the chain checked |
+|---|---|
+| `UniqueDevice(attester)` | An attester holding an allowance granted by `AttestationAllowanceManager` vouched for the candidate. The chain verified two signatures — the candidate consents, and the candidate owns the ring-VRF key — and that the key is not already in the collection |
+| `Fee` | `register_with_fee`: the candidate paid `RegistrationFee` and proved key ownership. **No attestation and no uniqueness check of any kind** |
+
+So in neither case does the chain establish *a human*. Under `UniqueDevice`, one
+person per record is the **attester's** claim; the chain checked signatures, not
+people. Under `Fee` it is not claimed by anyone — nothing stops one person
+registering repeatedly with fresh accounts and fresh keys, paying each time.
+
+The app shows which method was used, because "registered" alone does not say.
+
+**On this devnet, all 275 lite people were registered by `UniqueDevice`; none by
+`Fee` [T]** (scanned 2026-09-05). The fee path is live code with no instances
+here, so the app's handling of it is verified against the pallet and synthetic
+data, not against a real record.
+
+### The tier — None / Lite / Full
+
+The tier does **not** come from registration. The precompile calls
+`personhood_info(account, context)`, which returns nothing unless the account has
+an **alias** in that context; the tier is then derived from which ring collection
+that alias belongs to — `PEOPLE_LITE_IDENTIFIER` → Lite, `PEOPLE_IDENTIFIER` →
+Full **[S]**.
+
+`alias-accounts` documents `AliasFee` as *"`None` fails every registration with
+`AliasFeeUnset`"*, and `set_paid_alias_account` reads it on entry **[S]**. It is
+unset on this devnet **[T]**.
+
+**So no alias can be bound, and every account reads `None` — Lite and Full are
+both unreachable here, not just Full.** A `None` result on this devnet says
+nothing whatsoever about the account.
+
+### An alias
+
+Per the pallet docs an alias is the same person across sessions **within one
+context**, and a different context yields a different alias that cannot be linked
+to it **[S]**. That is the privacy property the design is built on.
+
+**This app has never observed one**, because none can exist here — treat the
+behaviour as `[S]`, not `[T]`.
+
+One caveat that is structural rather than cryptographic: `AccountToAlias` is a
+public map holding **one alias per account** **[S]**. The unlinkability is between
+*aliases in different contexts*, not between an account and its alias. An account
+that binds an alias is publicly tied to it, so using one account across two
+contexts defeats the property the alias exists to provide.
+
+### "No record"
+
+This account has no personhood. It does **not** establish that the person behind
+it has none — personhood binds to the account that owns the username, which is
+usually not the product or session account an app shows you **[T]**.
+
+### "Couldn't read"
+
+Exactly what it says, and deliberately distinct from every state above. See
+[the rule this app is built around](#a-rule-this-app-is-built-around).
+
 ## Context
 
 The `context` field scopes the alias. `dotns` is what DotNS uses. Change it and
