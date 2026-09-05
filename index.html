@@ -88,6 +88,16 @@
       td:first-child { font-family: var(--mono); }
       footer { color: var(--muted); font-size: .8rem; margin-top: 2rem; line-height: 1.7; }
       footer a { color: var(--accent); }
+      /* Unknown must never look like a "no". It gets the warning colour and a
+         dotted underline so it reads as a gap in our knowledge, not a fact. */
+      .unknown {
+        color: var(--warn); border-bottom: 1px dotted currentColor; font-style: normal;
+      }
+      .muted { color: var(--muted); font-family: inherit; }
+      #card .via { font-size: .78rem; color: var(--muted); margin: 0 0 .75rem; }
+      #card dd { line-height: 1.5; }
+      #peopleNote { font-size: .84rem; color: var(--muted); margin: 1.1rem 0 0;
+        padding-top: 1.1rem; border-top: 1px solid var(--line); }
       .hidden { display: none; }
     </style>
   </head>
@@ -99,8 +109,8 @@
       <div class="panel">
         <div class="row">
           <div>
-            <label for="address">Account — username (<code>.01</code>), SS58, or EVM address</label>
-            <input id="address" placeholder="northvane · 5Equii87… · 0x88cf…" spellcheck="false" />
+            <label for="address">Who is this? — SS58, EVM address, <code>.01</code> username, or <code>.dot</code> name</label>
+            <input id="address" placeholder="northvane.01 · whoisaperson.dot · 5CMZha9H… · 0x88cf…" spellcheck="false" />
           </div>
           <div>
             <label for="context">Context</label>
@@ -114,6 +124,22 @@
         </p>
         <p id="error" class="err hidden"></p>
       </div>
+
+      <section id="card" class="panel hidden" aria-live="polite">
+        <p class="chain-label">Identity card — one person, every name they go by</p>
+        <p class="via" id="cardVia"></p>
+        <dl>
+          <dt>Username</dt><dd id="cardUsername">—</dd>
+          <dt>SS58</dt><dd id="cardSs58">—</dd>
+          <dt>EVM</dt><dd id="cardEvm">—</dd>
+          <dt><code>.dot</code> names</dt><dd id="cardNames">—</dd>
+        </dl>
+        <p class="hint">
+          Anchored on the <strong>identity account</strong> — the one that owns the
+          username and carries the personhood record. Never a product account: those
+          are per-app, and an app only ever sees its own.
+        </p>
+      </section>
 
       <section id="result" class="panel hidden" aria-live="polite">
         <div style="margin-bottom: 1rem">
@@ -136,6 +162,7 @@
             <dt>Alias bound</dt><dd id="outAliasBound">—</dd>
           </dl>
         </div>
+        <p id="peopleNote" class="hidden"></p>
         <div id="verdict" class="verdict"></div>
       </section>
 

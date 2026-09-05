@@ -6,7 +6,16 @@
 
 import { blake2b } from "@noble/hashes/blake2.js";
 
-export const PEOPLE_RPC = "https://people-paseo.rotko.net";
+// Ordered, first that answers wins. rotko.net is last on purpose: it serves
+// state fine over curl but answers the CORS preflight with no Access-Control
+// headers, so a browser can never use it — which silently blanked the whole
+// People-chain panel. The other two send full preflight headers.
+export const PEOPLE_RPCS = [
+  "https://people-paseo.gatotech.network",
+  "https://rpc.interweb-it.com/people-paseo",
+  "https://people-paseo.rotko.net",
+];
+export const PEOPLE_RPC = PEOPLE_RPCS[0];
 
 // ── xxhash64 ────────────────────────────────────────────────────────────────
 
@@ -97,21 +106,52 @@ export function blake2_128Concat(bytes) {
 
 // ── storage ─────────────────────────────────────────────────────────────────
 
-export const ASSET_HUB_RPC = "https://asset-hub-paseo-rpc.n.dwellir.com";
+export const ASSET_HUB_RPCS = [
+  "https://asset-hub-paseo-rpc.n.dwellir.com",
+  "https://sys.turboflakes.io/asset-hub-paseo",
+];
+export const ASSET_HUB_RPC = ASSET_HUB_RPCS[0];
 
 export function storageKey(pallet, entry, keyBytes) {
   return "0x" + twox128(pallet) + twox128(entry) + (keyBytes ? blake2_128Concat(keyBytes) : "");
 }
 
-async function rpc(method, params, url) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  const json = await response.json();
-  if (json.error) throw new Error(json.error.message);
-  return json.result ?? null;
+// Which endpoint last answered, per list, so failover is paid once per session
+// rather than on every call.
+const live = new Map();
+
+/**
+ * One JSON-RPC call, tried against each endpoint until one responds.
+ *
+ * `urls` may be a single string so callers can still pin one endpoint. A
+ * node-level error (bad key, unknown method) is the chain answering and is
+ * rethrown; only a transport failure moves on to the next endpoint.
+ */
+async function rpc(method, params, urls) {
+  const list = Array.isArray(urls) ? urls : [urls];
+  const key = list[0];
+  const first = live.get(key);
+  const ordered = first ? [first, ...list.filter((u) => u !== first)] : list;
+
+  let transportError;
+  for (const url of ordered) {
+    let json;
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      });
+      json = await response.json();
+    } catch (e) {
+      transportError = e;
+      continue;
+    }
+    live.set(key, url);
+    if (json.error) throw new Error(json.error.message);
+    return json.result ?? null;
+  }
+  throw new Error(`no RPC endpoint reachable (${transportError?.message ?? "unknown"})`);
 }
 
 /**
@@ -122,39 +162,56 @@ async function rpc(method, params, url) {
  * chain can bind an alias*. Worth surfacing, because the symptom otherwise looks
  * like the user's own mistake.
  */
-export async function aliasFeeSet(url = ASSET_HUB_RPC) {
-  const raw = await rpc("state_getStorage", [storageKey("AliasAccounts", "AliasFee", null)], url);
+export async function aliasFeeSet(urls = ASSET_HUB_RPCS) {
+  const raw = await rpc("state_getStorage", [storageKey("AliasAccounts", "AliasFee", null)], urls);
   return raw !== null;
 }
 
 /** Returns the raw SCALE hex at a storage key, or null when the entry is empty. */
-export async function getStorage(pallet, entry, keyBytes, rpc = PEOPLE_RPC) {
-  const response = await fetch(rpc, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0", id: 1, method: "state_getStorage",
-      params: [storageKey(pallet, entry, keyBytes)],
-    }),
-  });
-  const json = await response.json();
-  if (json.error) throw new Error(json.error.message);
-  return json.result ?? null;
+export async function getStorage(pallet, entry, keyBytes, urls = PEOPLE_RPCS) {
+  return await rpc("state_getStorage", [storageKey(pallet, entry, keyBytes)], urls);
+}
+
+// pallet-revive answers `account_id` for addresses that were never mapped by
+// fabricating `<the 20 h160 bytes> ‖ 0xEE × 12` instead of failing. Rendering
+// that as an account would invent a person who does not exist, so it is checked
+// on every result. A real key colliding with this shape is a 2^-96 event.
+const FABRICATED_SUFFIX = "ee".repeat(12);
+
+/**
+ * EVM address → the Substrate account it maps to, via the `ReviveApi_account_id`
+ * runtime API.
+ *
+ * `keccak256(pubkey)[12:]` goes the other way and is not invertible, so this is
+ * the only route from an EVM address back to an account. It rides on plain
+ * `state_call` — the argument is 20 raw bytes and the result is 32, neither of
+ * which needs a SCALE codec.
+ *
+ * Returns `mapped: false` for the fabricated case. Callers must render that as
+ * "not mapped" and never as an address.
+ */
+export async function accountIdForEvm(evmAddress, urls = ASSET_HUB_RPCS) {
+  const h160 = evmAddress.toLowerCase().replace(/^0x/, "");
+  const raw = await rpc("state_call", ["ReviveApi_account_id", "0x" + h160], urls);
+  if (!raw) throw new Error("ReviveApi_account_id returned nothing");
+  const pk = raw.replace(/^0x/, "");
+  const fabricated = pk.slice(0, 40) === h160 && pk.slice(40) === FABRICATED_SUFFIX;
+  return { publicKey: fabricated ? null : "0x" + pk, mapped: !fabricated };
 }
 
 /**
  * PeopleLite.LitePeople — presence means the account is a registered person on
  * the People chain. The value begins with the 32-byte ring VRF key.
  */
-export async function litePeople(publicKey, rpc = PEOPLE_RPC) {
-  const raw = await getStorage("PeopleLite", "LitePeople", publicKey, rpc);
+export async function litePeople(publicKey, urls = PEOPLE_RPCS) {
+  const raw = await getStorage("PeopleLite", "LitePeople", publicKey, urls);
   if (!raw) return null;
   return { raw, ringVrfKey: "0x" + raw.replace(/^0x/, "").slice(0, 64) };
 }
 
 /** PeopleLite.AccountToAlias — presence means an alias is bound for this account. */
-export async function accountToAlias(publicKey, rpc = PEOPLE_RPC) {
-  return await getStorage("PeopleLite", "AccountToAlias", publicKey, rpc);
+export async function accountToAlias(publicKey, urls = PEOPLE_RPCS) {
+  return await getStorage("PeopleLite", "AccountToAlias", publicKey, urls);
 }
 
 // ── usernames ───────────────────────────────────────────────────────────────
@@ -171,14 +228,14 @@ let usernameCache = null;
  *
  * ~221 entries on the devnet, so this is cheap. Cached for the session.
  */
-export async function fetchUsernames(rpc = PEOPLE_RPC) {
+export async function fetchUsernames(urls = PEOPLE_RPCS) {
   if (usernameCache) return usernameCache;
 
   const prefix = "0x" + twox128("Resources") + twox128("UsernameOwnerOf");
-  const keys = await rpc_("state_getKeysPaged", [prefix, 1000], rpc);
+  const keys = await rpc("state_getKeysPaged", [prefix, 1000], urls);
   if (!keys?.length) return (usernameCache = []);
 
-  const [{ changes }] = await rpc_("state_queryStorageAt", [keys], rpc);
+  const [{ changes }] = await rpc("state_queryStorageAt", [keys], urls);
 
   usernameCache = changes
     .filter(([, value]) => value)
@@ -200,22 +257,11 @@ function decodeScaleString(bytes) {
 
 const fromHex = (h) => Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16)));
 
-async function rpc_(method, params, url) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  const json = await response.json();
-  if (json.error) throw new Error(json.error.message);
-  return json.result;
-}
-
 /** Usernames owned by a public key. */
-export async function usernamesFor(publicKey, rpc = PEOPLE_RPC) {
+export async function usernamesFor(publicKey, urls = PEOPLE_RPCS) {
   const want =
     "0x" + Array.from(publicKey, (b) => b.toString(16).padStart(2, "0")).join("");
-  return (await fetchUsernames(rpc))
+  return (await fetchUsernames(urls))
     .filter((u) => u.ownerHex === want)
     .map((u) => u.username);
 }
@@ -224,8 +270,8 @@ export async function usernamesFor(publicKey, rpc = PEOPLE_RPC) {
  * Resolve a username to its owner's public key.
  * Accepts `northvane` or `northvane.01` — bare labels match on the stem.
  */
-export async function resolveUsername(input, rpc = PEOPLE_RPC) {
-  const all = await fetchUsernames(rpc);
+export async function resolveUsername(input, urls = PEOPLE_RPCS) {
+  const all = await fetchUsernames(urls);
   const q = input.trim().toLowerCase();
   const hit =
     all.find((u) => u.username.toLowerCase() === q) ??

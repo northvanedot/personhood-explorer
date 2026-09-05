@@ -8,7 +8,18 @@ import { keccak_256 } from "@noble/hashes/sha3.js";
 import { blake2b } from "@noble/hashes/blake2.js";
 import { base58 } from "@scure/base";
 
-export const RPC = "https://paseo-assethub-rpc.laissez-faire.trade";
+// A single hard-coded endpoint took the whole app down on 2026-08-31, when this
+// host's Let's Encrypt certificate expired: browsers hard-fail an expired cert,
+// so every EVM-side lookup threw with nothing to fall back on. Ordered list,
+// first one that answers wins. Both were confirmed to be the same chain —
+// identical eth_chainId, identical classifyName() result, and a block height
+// matching the Substrate RPC.
+export const RPCS = [
+  "https://eth-rpc-testnet.polkadot.io",
+  "https://services.polkadothub-rpc.com/testnet",
+  "https://paseo-assethub-rpc.laissez-faire.trade",
+];
+export const RPC = RPCS[0];
 export const PERSONHOOD_PRECOMPILE = "0x000000000000000000000000000000000a010000";
 export const POP_RULES = "0x2181a14081fF2D4477BAA8FB1aEB4C9c44F5F2b0";
 
@@ -123,18 +134,36 @@ function decodeString(result, wordIndex) {
   return new TextDecoder().decode(toBytes(w.slice(start + 1).join("").slice(0, length * 2)));
 }
 
+// Remembered so that once an endpoint has answered we stop paying the failover
+// cost on every subsequent call in the session.
+let liveRpc = null;
+
 async function ethCall(to, data) {
-  const response = await fetch(RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0", id: 1, method: "eth_call",
-      params: [{ to, data: "0x" + data }, "latest"],
-    }),
+  const body = JSON.stringify({
+    jsonrpc: "2.0", id: 1, method: "eth_call",
+    params: [{ to, data: "0x" + data }, "latest"],
   });
-  const json = await response.json();
-  if (json.error) throw new Error(json.error.message);
-  return json.result;
+  // A revert is the chain's answer, not an outage — rethrow it rather than
+  // retrying elsewhere, or a genuine `NoPersonhood` would look like downtime.
+  let transportError;
+  for (const rpc of liveRpc ? [liveRpc, ...RPCS.filter((r) => r !== liveRpc)] : RPCS) {
+    let json;
+    try {
+      const response = await fetch(rpc, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      json = await response.json();
+    } catch (e) {
+      transportError = e;
+      continue;
+    }
+    liveRpc = rpc;
+    if (json.error) throw new Error(json.error.message);
+    return json.result;
+  }
+  throw new Error(`no devnet RPC reachable (${transportError?.message ?? "unknown"})`);
 }
 
 // ── queries ─────────────────────────────────────────────────────────────────
@@ -187,6 +216,25 @@ export async function nameOwner(label) {
   );
   const owner = "0x" + words(result)[0].slice(24);
   return /^0x0+$/.test(owner) ? null : owner;
+}
+
+export const DOTNS_REGISTRAR = "0x7f0dF075cc8B7FE7218E90fFC5a553450dB120F3";
+
+/**
+ * How many `.dot` names an EVM address owns.
+ *
+ * A count is all the chain will give. The registrar answers
+ * `supportsInterface(0x80ac58cd)` — it is ERC-721 — but returns 0 for
+ * `0x780e9d63` and reverts on `tokenOfOwnerByIndex`, so it is **not
+ * enumerable** and the names cannot be listed. Verified 2026-09-05.
+ * Confirming an individual name means asking `owner()` about that name.
+ */
+export async function dotNameCount(evmAddress) {
+  const result = await ethCall(
+    DOTNS_REGISTRAR,
+    selector("balanceOf(address)") + evmAddress.replace(/^0x/, "").toLowerCase().padStart(64, "0"),
+  );
+  return Number(BigInt("0x" + words(result)[0]));
 }
 
 /** PopRules.price(string) → registration price, in 18-decimal EVM units. */
