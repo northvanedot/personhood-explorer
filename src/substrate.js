@@ -155,16 +155,25 @@ async function rpc(method, params, urls) {
 }
 
 /**
- * AliasAccounts.AliasFee on Asset Hub.
+ * Is the alias fee set on Asset Hub?
  *
- * `set_alias_account` reads this on its second line and aborts with
- * `AliasFeeUnset` when it's None — so while this is empty, *no account on the
- * chain can bind an alias*. Worth surfacing, because the symptom otherwise looks
- * like the user's own mistake.
+ * `set_alias_account` aborts with `AliasFeeUnset` while the fee is None — so
+ * while it is, *no account on the chain can bind an alias*. Worth surfacing,
+ * because the symptom otherwise looks like the user's own mistake.
+ *
+ * From runtime v2.5.x the fee is no longer `AliasAccounts.AliasFee` storage —
+ * that item is gone, so reading it returns null whatever the fee is. It is a
+ * root-only dynamic parameter in `pallet_parameters`, default None
+ * (paseo-network/runtimes, asset-hub-paseo). The key is
+ * `RuntimeParametersKey::AliasAccounts(AliasFee)` = [3, 0]; the value is
+ * [3, 0, Option<u128>]. No entry means the default, None.
  */
+const ALIAS_FEE_PARAM = new Uint8Array([3, 0]);
+
 export async function aliasFeeSet(urls = ASSET_HUB_RPCS) {
-  const raw = await rpc("state_getStorage", [storageKey("AliasAccounts", "AliasFee", null)], urls);
-  return raw !== null;
+  const raw = await rpc("state_getStorage", [storageKey("Parameters", "Parameters", ALIAS_FEE_PARAM)], urls);
+  // Third byte is the Option tag: 01 = Some(fee), 00 = None set explicitly.
+  return raw !== null && raw.slice(2 + 4, 2 + 6) === "01";
 }
 
 /** Returns the raw SCALE hex at a storage key, or null when the entry is empty. */

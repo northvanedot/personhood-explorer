@@ -82,14 +82,14 @@ function establishesRegistration(method) {
  *
  * Status is read off an *alias* record, not off registration — `personhood_info`
  * returns nothing when the account has no alias in the context, and the tier is
- * then derived from which collection that alias belongs to. With `AliasFee`
+ * then derived from which collection that alias belongs to. With the alias fee
  * unset no alias can be bound, so on this devnet **every** tier above None is
  * unreachable, not just Full.
  */
 function establishesTier(status, feeSet) {
   if (status === 0) {
     return feeSet === false
-      ? `The tier comes from an <em>alias</em> record, not from registration. <code>AliasFee</code> is unset chain-wide, so no account can bind one — <strong>None is the only tier reachable on this devnet</strong>, for everyone. It does not mean this account was rejected.`
+      ? `The tier comes from an <em>alias</em> record, not from registration. The alias fee is unset chain-wide, so no account can bind one — <strong>None is the only tier reachable on this devnet</strong>, for everyone. It does not mean this account was rejected.`
       : `No alias bound in this context, so the precompile reports None. That is a statement about this account in this context, <strong>not about the person</strong>.`;
   }
   if (status === 1) {
@@ -108,7 +108,7 @@ function establishesTier(status, feeSet) {
 const ESTABLISHES_ALIAS =
   `Per the pallet docs, an alias is <strong>the same person across sessions within one context</strong>, and a different context yields a different alias that cannot be linked to it. <strong>Unverified here</strong> — no alias can be bound on this devnet, so this app has never seen one. Note also that <code>AccountToAlias</code> holds one alias per account and is public, so an account that binds one is publicly tied to it.`;
 
-// `AliasFee` is chain-wide state, not per-account, so one read serves every
+// The alias fee is chain-wide state, not per-account, so one read serves every
 // lookup in the session — and it is what lets the name checker say that a gated
 // name is unclaimable rather than merely gated.
 let aliasFeePromise = null;
@@ -129,7 +129,7 @@ let lastLabel = "that account";
  * ecosystem currently tells you it's what's happening.
  */
 /** Shown whenever a missing alias is the chain's fault rather than the user's. */
-const CHAIN_BLOCKED = `<strong>Not your doing.</strong> <code>AliasAccounts.AliasFee</code> is unset chain-wide, so <code>set_alias_account</code> fails for everyone. Needs a governance call.`;
+const CHAIN_BLOCKED = `<strong>Not your doing.</strong> The alias fee — a root-only runtime parameter, <code>AliasFee</code> — is unset chain-wide, so <code>set_alias_account</code> fails for everyone. Needs a root-origin call to open.`;
 
 function explain({ status, aliasSet }, people, rawContext, feeSet) {
   // Everything below builds HTML, so escape once here rather than at each use.
@@ -543,11 +543,10 @@ async function checkName() {
     };
     $("nameStatus").textContent = owner ? `registered — ${owner}` : "unregistered";
     $("nameRequires").textContent = `${TIERS[requires]?.label ?? requires} — ${REQUIREMENT[requires] ?? message}`;
-    // PopRules returns 0 for every label that is not open to all, and 10 PAS for
-    // every label that is. A bare "0 PAS" beside "nobody can claim this" reads
-    // like a broken field, when it is the contract making the same point the
-    // verdict does: the barrier is personhood, not money. Verified across 6, 7,
-    // 8 and 10 character labels.
+    // The v1 PopRules returned 0 for every label not open to all; the v3 one in use
+    // since 2026-10-05 returns 10 PAS for 6–8 character labels too. The 0 branches
+    // stay so a zero still reads as the contract's point — the barrier is
+    // personhood or governance, not money — rather than as a broken field.
     $("namePrice").textContent =
       price === null
         ? "—"
@@ -573,14 +572,14 @@ async function checkName() {
       verdict = `Governance-reserved — labels of 5 characters or fewer aren't open.`;
     } else if (requires > 0 && feeSet === false) {
       // The gate is a personhood tier, and no tier above None is reachable while
-      // AliasFee is unset. Saying only "needs personhood" sends people off to
+      // the alias fee is unset. Saying only "needs personhood" sends people off to
       // earn something nobody on this chain can have.
       tone = "warn";
       verdict =
         `<strong>Nobody can claim this name on this devnet.</strong> It needs ` +
         `<strong>${esc(TIERS[requires].label)}</strong> personhood, and personhood is read from a ` +
-        `contextual alias that no account can bind — <code>AliasAccounts.AliasFee</code> is unset ` +
-        `chain-wide. Not a gate you can pass: it needs a governance call to open. ` +
+        `contextual alias that no account can bind — the alias fee is unset ` +
+        `chain-wide. Not a gate you can pass: it needs a root-origin call to open. ` +
         `<strong>9 characters or more has no personhood requirement.</strong>`;
     } else if (requires > 0 && lastTier !== null && requires > lastTier) {
       tone = "warn";

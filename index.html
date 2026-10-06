@@ -191,11 +191,12 @@
               <code>PEOPLE_IDENTIFIER</code> → Full.
             </p>
             <p>
-              <code>alias-accounts</code> documents <code>AliasFee</code> as
-              <em>"<code>None</code> fails every registration with <code>AliasFeeUnset</code>"</em>,
-              and reads it on entry to <code>set_paid_alias_account</code>.
+              Binding an alias costs a fee, <code>AliasFee</code>, and while it is
+              <code>None</code> every <code>set_alias_account</code> fails with
+              <code>AliasFeeUnset</code>. Since runtime v2.5 the fee is a root-only runtime
+              parameter rather than pallet storage, and it defaults to <code>None</code> — the
+              Asset Hub runtime's own comment notes it has never been set on Paseo.
               It is unset on this devnet.
-             
             </p>
             <p>
               <strong>So no alias can be bound, and every account reads None — Lite and Full are
@@ -301,7 +302,7 @@
         </div>
         <p class="hint">
           A separate registry from usernames — a <code>.01</code> username gives no claim
-          on the matching <code>.dot</code>. Short names need personhood, not money.
+          on the matching <code>.dot</code>. Short names need personhood as well as the price.
         </p>
         <div id="nameResult" class="hidden" style="margin-top: 1rem">
           <table>

@@ -21,7 +21,13 @@ export const RPCS = [
 ];
 export const RPC = RPCS[0];
 export const PERSONHOOD_PRECOMPILE = "0x000000000000000000000000000000000a010000";
-export const POP_RULES = "0x2181a14081fF2D4477BAA8FB1aEB4C9c44F5F2b0";
+
+// DotNS contracts — the v3 set, from the devnet environment shipped in
+// polkadot-app-deploy 0.16.6+ and the docs' Addresses page. Devnet has moved DotNS
+// twice, and each time the old contracts stay readable and answer without error,
+// so a stale address here does not fail: it quietly reports every newer name as
+// unregistered. Until 2026-10-05 this file read v1, retired 2026-09-08.
+export const POP_RULES = "0xD5Ee34610F06f7FF4668aB4fabE2393B65a43AE7";
 
 /** Personhood tiers. 0–2 are documented in IPersonhood; the dotns CLI also maps 3. */
 export const TIERS = {
@@ -196,7 +202,7 @@ export async function classifyName(label) {
   };
 }
 
-export const DOTNS_REGISTRY = "0x527b08a640b527a3dae0C4BE04D7344E430B6E50";
+export const DOTNS_REGISTRY = "0xb052E5EfC5ADEff1f21d48DEfb5169Cb394A1a73";
 
 /** ENS-style namehash: fold labels right-to-left into a 32-byte node. */
 export function namehash(name) {
@@ -218,7 +224,7 @@ export async function nameOwner(label) {
   return /^0x0+$/.test(owner) ? null : owner;
 }
 
-export const DOTNS_REGISTRAR = "0x7f0dF075cc8B7FE7218E90fFC5a553450dB120F3";
+export const DOTNS_REGISTRAR = "0xc609e0c2DAB4433d55a32FB098Db8788C1956302";
 
 /**
  * How many `.dot` names an EVM address owns.

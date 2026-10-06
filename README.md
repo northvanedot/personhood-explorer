@@ -33,10 +33,15 @@ AliasAccounts.AliasFee  on the devnet Asset Hub  →  unset
 `AliasFeeUnset` before doing anything else. There is no unpaid path — no
 `call_index(0)`, no alternative extrinsic.
 
+Since runtime v2.5 the fee is no longer pallet storage: it is a root-only runtime
+parameter (`Parameters`, key `AliasAccounts::AliasFee`) that defaults to `None` —
+and still unset **[T]** 2026-10-05. The Asset Hub runtime's own source now notes
+it has never been set on Paseo **[S]**. Same block, new home.
+
 **So no account on the devnet can bind a contextual alias at all.** Every
 personhood check on Asset Hub therefore returns `status 0`, and
 `Publisher.publish` always reverts `NoPersonhood` — for everyone, regardless of
-what they do in the app. It needs one governance call to `set_alias_fee`.
+what they do in the app. It needs one root-origin `Parameters::set_parameter` call.
 
 The explorer says so when it applies, because the symptom otherwise looks exactly
 like the user's own mistake.
@@ -69,7 +74,9 @@ host container.
 | | |
 |---|---|
 | `IPersonhood` precompile | `0x000000000000000000000000000000000a010000` |
-| `PopRules` | `0x2181a14081fF2D4477BAA8FB1aEB4C9c44F5F2b0` |
+| `PopRules` (DotNS v3) | `0xD5Ee34610F06f7FF4668aB4fabE2393B65a43AE7` |
+| DotNS Registry (v3) | `0xb052E5EfC5ADEff1f21d48DEfb5169Cb394A1a73` |
+| DotNS Registrar (v3) | `0xc609e0c2DAB4433d55a32FB098Db8788C1956302` |
 | RPC | `https://eth-rpc-testnet.polkadot.io`, with failover |
 
 Personhood is proved by **ring-VRF membership**. The alias is *unique per person
@@ -130,9 +137,10 @@ an **alias** in that context; the tier is then derived from which ring collectio
 that alias belongs to — `PEOPLE_LITE_IDENTIFIER` → Lite, `PEOPLE_IDENTIFIER` →
 Full **[S]**.
 
-`alias-accounts` documents `AliasFee` as *"`None` fails every registration with
-`AliasFeeUnset`"*, and `set_paid_alias_account` reads it on entry **[S]**. It is
-unset on this devnet **[T]**.
+While the alias fee is `None`, every `set_alias_account` fails with
+`AliasFeeUnset` **[S]**. Since runtime v2.5 the fee is a root-only runtime
+parameter defaulting to `None`, not pallet storage **[S]**. It is unset on this
+devnet **[T]**.
 
 **So no alias can be bound, and every account reads `None` — Lite and Full are
 both unreachable here, not just Full.** A `None` result on this devnet says
