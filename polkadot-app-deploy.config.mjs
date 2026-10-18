@@ -18,7 +18,7 @@ export default {
   domain: "whoisaperson.dot",
   displayName: "Personhood Explorer",
   description:
-    "Who is this? Enter an SS58 address, an EVM address, a .01 username or a .dot name and see all of them together, plus proof-of-personhood state — and what each result actually establishes, which is usually less than the tier name suggests. Read-only.",
+    "Who is this? Enter an SS58 address, an EVM address, a username or a .dot name and see that account's names together, plus proof-of-personhood state — and what each result actually establishes, which is usually less than the tier name suggests. Read-only.",
   icon: {
     path: "icon.png",
     format: "png",
@@ -27,7 +27,7 @@ export default {
     {
       kind: "app",
       path: "dist",
-      appVersion: [1, 3, 1],
+      appVersion: [1, 3, 2],
     },
   ],
 };

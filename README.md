@@ -126,8 +126,8 @@ registering repeatedly with fresh accounts and fresh keys, paying each time.
 
 The app shows which method was used, because "registered" alone does not say.
 
-**On this devnet, all 401 lite people were registered by `UniqueDevice`; none by
-`Fee` [T]** (scanned 2026-10-08; 275 on 2026-09-05). The fee path is live code with no instances
+**On this devnet, all 850 lite people were registered by `UniqueDevice`; none by
+`Fee` [T]** (scanned 2026-10-18; 401 on 2026-10-08, 275 on 2026-09-05). The fee path is live code with no instances
 here, so the app's handling of it is verified against the pallet and synthetic
 data, not against a real record.
 
