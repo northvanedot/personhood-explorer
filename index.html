@@ -140,7 +140,7 @@
         <div class="row">
           <div>
             <label for="address">Who is this? — SS58, EVM address, username (like <code>name.02</code>), or <code>.dot</code> name</label>
-            <input id="address" placeholder="northvane.02 · whoisaperson.dot · 5Ckop… · 0x1cf3…" spellcheck="false" />
+            <input id="address" placeholder="northvane.02 · whoisaperson.dot · 5DXuu… · 0xc1d8…" spellcheck="false" />
           </div>
           <div>
             <label for="context">Context</label>
@@ -221,7 +221,7 @@
             <dt>Alias bound</dt><dd id="outAliasBound">—</dd>
           </dl>
           <p id="peopleEstablishes" class="establishes hidden"></p>
-          <details class="longform">
+          <details class="longform" id="registrationDetails">
             <summary>What registration does and does not establish</summary>
             <div>
               <p>
@@ -256,11 +256,7 @@
                 claims it: nothing stops one person registering repeatedly with fresh accounts
                 and fresh keys, paying each time.
               </p>
-              <p>
-                At the last count (18 October 2026) all <strong>850</strong> lite people on
-                this devnet were registered by <code>UniqueDevice</code> and none by
-                <code>Fee</code>, so the fee path is live code with no instances here.
-              </p>
+              <p id="litePeopleCount">Counting the lite people on this devnet…</p>
             </div>
           </details>
           <p id="aliasEstablishes" class="establishes hidden"></p>

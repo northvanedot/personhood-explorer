@@ -231,6 +231,37 @@ export async function litePeople(publicKey, urls = PEOPLE_RPCS) {
   return { raw, ringVrfKey: "0x" + body.slice(0, 64), method };
 }
 
+/**
+ * Every PeopleLite.LitePeople record, counted by recognition method.
+ *
+ * Read live because a hard-coded count went stale twice in six weeks (275 → 401 →
+ * 850). Keys are paged, then the values fetched in batches to read each method
+ * tag — the same 00 `UniqueDevice` / 01 `Fee` byte `litePeople` decodes. Around a
+ * thousand records costs half a dozen requests, which is why the caller only
+ * asks when someone opens the section that uses it.
+ */
+export async function litePeopleTally(urls = PEOPLE_RPCS) {
+  const prefix = "0x" + twox128("PeopleLite") + twox128("LitePeople");
+  const keys = [];
+  for (let start = null; ; ) {
+    const page = await rpc("state_getKeysPaged", [prefix, 1000, start], urls);
+    if (!page?.length) break;
+    keys.push(...page);
+    if (page.length < 1000) break;
+    start = page[page.length - 1];
+  }
+  const tally = { total: keys.length, device: 0, fee: 0, other: 0 };
+  for (let i = 0; i < keys.length; i += 200) {
+    const [set] = await rpc("state_queryStorageAt", [keys.slice(i, i + 200)], urls);
+    for (const [, value] of set.changes) {
+      // Value is ring_vrf_key (32 bytes) then the method tag.
+      const tag = value?.slice(2 + 64, 2 + 66);
+      tag === "00" ? tally.device++ : tag === "01" ? tally.fee++ : tally.other++;
+    }
+  }
+  return tally;
+}
+
 /** PeopleLite.AccountToAlias — presence means an alias is bound for this account. */
 export async function accountToAlias(publicKey, urls = PEOPLE_RPCS) {
   return await getStorage("PeopleLite", "AccountToAlias", publicKey, urls);

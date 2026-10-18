@@ -17,6 +17,7 @@ import {
   resolveUsername,
   usernamesFor,
   accountIdForEvm,
+  litePeopleTally,
 } from "./substrate.js";
 import { publicKeyToSs58, publicKeyToEvm } from "./chain.js";
 
@@ -592,6 +593,31 @@ async function checkName() {
     $("checkName").textContent = "Check name";
   }
 }
+
+// Counted live, and only when someone opens the section: a hard-coded figure went
+// stale twice, and a full read is half a dozen requests nobody else should pay for.
+// A failed read says unknown — the app never shows a guess as a count.
+let litePeopleCounted = false;
+$("registrationDetails").addEventListener("toggle", async () => {
+  if (!$("registrationDetails").open || litePeopleCounted) return;
+  litePeopleCounted = true;
+  const out = $("litePeopleCount");
+  try {
+    const { total, device, fee, other } = await litePeopleTally();
+    const n = (x) => `<strong>${esc(x.toLocaleString("en-US"))}</strong>`;
+    // The unrecognised count goes last, as its own sentence, so it cannot be read as
+    // the subject of the clause about Fee.
+    const odd = !other ? "" : other === 1 ? " One more carries a method this app does not recognise." : ` ${n(other)} more carry a method this app does not recognise.`;
+    const all = other ? `${n(device)} of the ${n(total)}` : `All ${n(total)}`;
+    out.innerHTML =
+      (fee === 0
+        ? `${all} lite people on this devnet, counted just now, were registered by <code>UniqueDevice</code> and none by <code>Fee</code>, so the fee path is live code with no instances here.`
+        : `Of ${n(total)} lite people on this devnet, counted just now, ${n(device)} were registered by <code>UniqueDevice</code> and ${n(fee)} by <code>Fee</code> — for those ${n(fee)}, the chain asserts nothing about uniqueness.`) + odd;
+  } catch {
+    litePeopleCounted = false;
+    out.textContent = "The People chain could not be read just now, so the count is unknown — not zero. Close and reopen this section to try again.";
+  }
+});
 
 $("check").addEventListener("click", check);
 $("checkName").addEventListener("click", checkName);

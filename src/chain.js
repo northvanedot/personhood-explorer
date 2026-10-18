@@ -109,7 +109,7 @@ export function resolveAddress(input) {
     // Surface our own checks; translate the base58 decoder's internals.
     if (/checksum|32-byte/i.test(err.message)) throw err;
     throw new Error(
-      "Not a recognisable address. Expected an SS58 address (like 5CkopLf1…) or an EVM address (0x… with 40 hex characters).",
+      "Not a recognisable address. Expected an SS58 address (like 5DXuuCoE…) or an EVM address (0x… with 40 hex characters).",
     );
   }
   return { evm: publicKeyToEvm(publicKey), ss58: value, publicKey: "0x" + hex(publicKey) };
