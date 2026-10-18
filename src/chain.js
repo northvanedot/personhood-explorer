@@ -1,8 +1,9 @@
 // Read-only queries against the Polkadot Products Devnet.
 //
 // Everything here goes through plain Ethereum JSON-RPC `eth_call` — no host,
-// no wallet, no signing. Constants verified 2026-08-07 against @parity/dotns-cli
-// and the IPersonhood interface in Polkadot-Community-Foundation/individuality-community.
+// no wallet, no signing. The personhood constants were verified 2026-08-07 against the
+// IPersonhood interface in Polkadot-Community-Foundation/individuality-community; the
+// DotNS addresses below come from polkadot-app-deploy's devnet environment.
 
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import { blake2b } from "@noble/hashes/blake2.js";
@@ -31,7 +32,7 @@ export const POP_RULES = "0xD5Ee34610F06f7FF4668aB4fabE2393B65a43AE7";
 
 /** Personhood tiers. 0–2 are documented in IPersonhood; the dotns CLI also maps 3. */
 export const TIERS = {
-  0: { key: "none", label: "None", blurb: "No personhood record in this context" },
+  0: { key: "none", label: "None", blurb: "No alias in this context" },
   1: { key: "lite", label: "Lite", blurb: "ProofOfPersonhoodLite" },
   2: { key: "full", label: "Full", blurb: "ProofOfPersonhoodFull" },
   3: { key: "reserved", label: "Reserved", blurb: "Reserved tier" },
@@ -108,7 +109,7 @@ export function resolveAddress(input) {
     // Surface our own checks; translate the base58 decoder's internals.
     if (/checksum|32-byte/i.test(err.message)) throw err;
     throw new Error(
-      "Not a recognisable address. Expected an SS58 address (like 5CMZha9H…) or an EVM address (0x… with 40 hex characters).",
+      "Not a recognisable address. Expected an SS58 address (like 5CkopLf1…) or an EVM address (0x… with 40 hex characters).",
     );
   }
   return { evm: publicKeyToEvm(publicKey), ss58: value, publicKey: "0x" + hex(publicKey) };

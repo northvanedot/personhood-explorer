@@ -27,7 +27,7 @@ export default {
     {
       kind: "app",
       path: "dist",
-      appVersion: [1, 3, 0],
+      appVersion: [1, 3, 1],
     },
   ],
 };

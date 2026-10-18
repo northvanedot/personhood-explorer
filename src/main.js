@@ -89,7 +89,7 @@ function establishesRegistration(method) {
 function establishesTier(status, feeSet) {
   if (status === 0) {
     return feeSet === false
-      ? `The tier comes from an <em>alias</em> record, not from registration. The alias fee is unset chain-wide, so no account can bind one — <strong>None is the only tier reachable on this devnet</strong>, for everyone. It does not mean this account was rejected.`
+      ? `The tier comes from an <em>alias</em>, not from registration, and nobody can bind one on this devnet (below) — <strong>None is the only tier anyone can have here</strong>. It does not mean this account was rejected.`
       : `No alias bound in this context, so the precompile reports None. That is a statement about this account in this context, <strong>not about the person</strong>.`;
   }
   if (status === 1) {
@@ -149,10 +149,9 @@ function explain({ status, aliasSet }, people, rawContext, feeSet) {
   // Registered on the People chain, but Asset Hub can't see it.
   if (people?.registered) {
     const lines = [
-      `<strong>Registered person</strong> on the People chain — ring-VRF key present.`,
       people.aliasBound
         ? `Alias bound there, but Asset Hub reports none for <code>${context}</code> — the ring root may not have propagated.`
-        : `No alias bound, so Asset Hub sees nobody. This is the state behind a <code>NoPersonhood</code> revert — the same condition every account on this devnet is in.`,
+        : `No alias bound, so Asset Hub sees nobody — the state behind a <code>NoPersonhood</code> revert.`,
     ];
     if (feeSet === false) lines.push(CHAIN_BLOCKED);
     return { tone: "warn", lines };
@@ -190,7 +189,7 @@ function explain({ status, aliasSet }, people, rawContext, feeSet) {
 
 /**
  * Work out which account the input names, from any of the four identifiers a
- * person has here: an SS58 address, an EVM address, a `.01` username, or a
+ * person has here: an SS58 address, an EVM address, a username, or a
  * `.dot` name.
  *
  * Everything anchors on the **identity account** — the one that owns the
@@ -422,20 +421,10 @@ async function check() {
       };
       usernames = Array.isArray(cardUsernames) ? cardUsernames : [];
     }
-    $("outUsername").textContent = usernames.length
-      ? usernames.join(", ")
-      : matchedUsername ?? (ss58 ? "none registered" : "— (EVM address given)");
-
     const tier = TIERS[info.status] ?? { key: "none", label: `Unknown (${info.status})`, blurb: "" };
     $("tier").className = `badge ${tier.key}`;
     $("tier").textContent = tier.label;
     $("tierBlurb").textContent = tier.blurb;
-    const ss58Text =
-      ss58 === UNKNOWN
-        ? "unknown — couldn't read the chain"
-        : (ss58 ?? (identity.mapped === false ? "not mapped" : "— (EVM address given)"));
-    $("outSs58").textContent = ss58Text;
-    $("outEvm").textContent = evm;
     $("outContext").textContent = `"${context}"  ·  0x${contextWord(context)}`;
     $("outAlias").textContent = info.aliasSet ? info.contextAlias : "not set (all zero)";
 

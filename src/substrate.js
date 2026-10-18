@@ -248,7 +248,7 @@ let usernameCache = null;
  * the *unhashed* key to the storage key — so the username itself is readable
  * straight out of the key list, no extra lookup needed.
  *
- * ~221 entries on the devnet, so this is cheap. Cached for the session.
+ * A few hundred entries on the devnet, so this is cheap. Cached for the session.
  */
 export async function fetchUsernames(urls = PEOPLE_RPCS) {
   if (usernameCache) return usernameCache;
@@ -290,13 +290,23 @@ export async function usernamesFor(publicKey, urls = PEOPLE_RPCS) {
 
 /**
  * Resolve a username to its owner's public key.
- * Accepts `northvane` or `northvane.01` — bare labels match on the stem.
+ * Accepts `northvane` or `northvane.02` — a bare label matches on the stem, but only
+ * when exactly one username has that stem. Suffixes exist because a stem can belong to
+ * several accounts (one person reinstalling gets a new one), so picking the first would
+ * silently answer for the wrong account.
  */
 export async function resolveUsername(input, urls = PEOPLE_RPCS) {
   const all = await fetchUsernames(urls);
   const q = input.trim().toLowerCase();
-  const hit =
-    all.find((u) => u.username.toLowerCase() === q) ??
-    all.find((u) => u.username.toLowerCase().replace(/\.\d+$/, "") === q);
-  return hit ? { username: hit.username, publicKey: fromHex(hit.ownerHex.slice(2)) } : null;
+  const toHit = (u) => ({ username: u.username, publicKey: fromHex(u.ownerHex.slice(2)) });
+  const exact = all.find((u) => u.username.toLowerCase() === q);
+  if (exact) return toHit(exact);
+  const stem = all.filter((u) => u.username.toLowerCase().replace(/\.\d+$/, "") === q);
+  if (stem.length > 1) {
+    const names = stem.map((u) => u.username).sort().join(", ");
+    throw new Error(
+      `"${input.trim()}" matches ${stem.length} usernames — ${names}. Type one in full, or ${q}.dot for the .dot name.`,
+    );
+  }
+  return stem.length ? toHit(stem[0]) : null;
 }

@@ -48,10 +48,12 @@ like the user's own mistake.
 
 ## What it does
 
-Give it **any one of a person's four identifiers** — an SS58 address, an EVM
-address, a `.01` username, or a `.dot` name — and it shows all of them together,
-anchored on the identity account: the one that owns the username and carries the
-personhood record, never a per-app product account.
+Give it **any one of an account's four identifiers** — an SS58 address, an EVM
+address, a username (`name.01`, `name.02`, …), or a `.dot` name — and it shows all of
+them together, anchored on the identity account: the one that owns the username and
+carries the personhood record, never a per-app product account. One person can hold
+several identity accounts — reinstalling the app creates a new one — and nothing on
+chain links them, so the card speaks for one account only.
 
 It then reports the personhood tier (None / Lite / Full), the contextual alias,
 and a diagnosis:
@@ -124,8 +126,8 @@ registering repeatedly with fresh accounts and fresh keys, paying each time.
 
 The app shows which method was used, because "registered" alone does not say.
 
-**On this devnet, all 275 lite people were registered by `UniqueDevice`; none by
-`Fee` [T]** (scanned 2026-09-05). The fee path is live code with no instances
+**On this devnet, all 401 lite people were registered by `UniqueDevice`; none by
+`Fee` [T]** (scanned 2026-10-08; 275 on 2026-09-05). The fee path is live code with no instances
 here, so the app's handling of it is verified against the pallet and synthetic
 data, not against a real record.
 

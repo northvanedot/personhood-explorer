@@ -139,8 +139,8 @@
       <div class="panel">
         <div class="row">
           <div>
-            <label for="address">Who is this? — SS58, EVM address, <code>.01</code> username, or <code>.dot</code> name</label>
-            <input id="address" placeholder="northvane.01 · whoisaperson.dot · 5CMZha9H… · 0x88cf…" spellcheck="false" />
+            <label for="address">Who is this? — SS58, EVM address, username (like <code>name.02</code>), or <code>.dot</code> name</label>
+            <input id="address" placeholder="northvane.02 · whoisaperson.dot · 5Ckop… · 0x1cf3…" spellcheck="false" />
           </div>
           <div>
             <label for="context">Context</label>
@@ -149,16 +149,14 @@
           <button id="check">Check</button>
         </div>
         <p class="hint">
-          The context scopes the alias. By design a different context gives the same person
-          a different alias that can't be linked to this one — but that is how the pallet is
-          written, not something anyone has seen work here: no alias can be bound on this
-          devnet. An account that binds one is also publicly tied to it.
+          The context scopes the alias: a different context gives the same person a
+          different alias that can't be linked to this one.
         </p>
         <p id="error" class="err hidden"></p>
       </div>
 
       <section id="card" class="panel hidden" aria-live="polite">
-        <p class="chain-label">Identity card — one person, every name they go by</p>
+        <p class="chain-label">Identity card — one account, every name it goes by</p>
         <p class="via" id="cardVia"></p>
         <dl>
           <dt>Username</dt><dd id="cardUsername">—</dd>
@@ -169,7 +167,9 @@
         <p class="hint">
           Anchored on the <strong>identity account</strong> — the one that owns the
           username and carries the personhood record. Never a product account: those
-          are per-app, and an app only ever sees its own.
+          are per-app, and an app only ever sees its own. One person can hold several
+          identity accounts — reinstalling the app creates a new one — and nothing on chain
+          links them, so this card never speaks for a person's other accounts.
         </p>
       </section>
 
@@ -207,9 +207,6 @@
         </details>
         <p class="chain-label">Asset Hub — what contracts see</p>
         <dl>
-          <dt>Username</dt><dd id="outUsername">—</dd>
-          <dt>SS58</dt><dd id="outSs58">—</dd>
-          <dt>EVM</dt><dd id="outEvm">—</dd>
           <dt>Context</dt><dd id="outContext">—</dd>
           <dt>Contextual alias</dt><dd id="outAlias">—</dd>
         </dl>
@@ -258,10 +255,9 @@
                 and fresh keys, paying each time.
               </p>
               <p>
-                On this devnet all <strong>275</strong> lite people were registered by
-                <code>UniqueDevice</code> and none by <code>Fee</code>
-               , so the fee path is live code with no instances
-                here.
+                At the last count (8 October 2026) all <strong>401</strong> lite people on
+                this devnet were registered by <code>UniqueDevice</code> and none by
+                <code>Fee</code>, so the fee path is live code with no instances here.
               </p>
             </div>
           </details>
@@ -301,8 +297,8 @@
           <button id="checkName">Check name</button>
         </div>
         <p class="hint">
-          A separate registry from usernames — a <code>.01</code> username gives no claim
-          on the matching <code>.dot</code>. Short names need personhood as well as the price.
+          A separate registry from usernames — owning <code>northvane.02</code> gives no claim
+          on <code>northvane.dot</code>. Short names need personhood as well as the price.
         </p>
         <div id="nameResult" class="hidden" style="margin-top: 1rem">
           <table>
@@ -319,8 +315,8 @@
       </section>
 
       <footer>
-        Reads the <code>IPersonhood</code> precompile and <code>PopRules</code> on Asset
-        Hub, and <code>PeopleLite</code> on the People chain.
+        Reads the <code>IPersonhood</code> precompile, <code>PopRules</code> and the DotNS
+        registry on Asset Hub, and usernames and <code>PeopleLite</code> on the People chain.
         <br />
         Devnet only — unaudited prototype, state may reset. Lookups go to public RPCs,
         which can log them.
