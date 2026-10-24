@@ -170,10 +170,30 @@ async function rpc(method, params, urls) {
  */
 const ALIAS_FEE_PARAM = new Uint8Array([3, 0]);
 
-export async function aliasFeeSet(urls = ASSET_HUB_RPCS) {
+export async function aliasFee(urls = ASSET_HUB_RPCS) {
   const raw = await rpc("state_getStorage", [storageKey("Parameters", "Parameters", ALIAS_FEE_PARAM)], urls);
-  // Third byte is the Option tag: 01 = Some(fee), 00 = None set explicitly.
-  return raw !== null && raw.slice(2 + 4, 2 + 6) === "01";
+  // Third byte is the Option tag: 01 = Some(fee), 00 = None set explicitly. The fee
+  // itself is a little-endian u128 after it, in the PGAS asset's base units.
+  if (raw === null || raw.slice(6, 8) !== "01") return { set: false, amount: null };
+  const le = raw.slice(8, 8 + 32).match(/../g).reverse().join("");
+  return { set: true, amount: BigInt("0x" + le) };
+}
+
+/**
+ * How many accounts have an alias bound on Asset Hub, chain-wide. Keys only, so one
+ * request while the map is small. A failed read throws rather than returning 0.
+ */
+export async function aliasCount(urls = ASSET_HUB_RPCS) {
+  const prefix = "0x" + twox128("AliasAccounts") + twox128("AccountToAlias");
+  let total = 0;
+  for (let start = null; ; ) {
+    const page = await rpc("state_getKeysPaged", [prefix, 1000, start], urls);
+    if (!page?.length) break;
+    total += page.length;
+    if (page.length < 1000) break;
+    start = page[page.length - 1];
+  }
+  return total;
 }
 
 /** Returns the raw SCALE hex at a storage key, or null when the entry is empty. */
@@ -262,6 +282,24 @@ export async function litePeopleTally(urls = PEOPLE_RPCS) {
   return tally;
 }
 
+/**
+ * How many entries a storage map holds, from its keys alone: no values fetched, so
+ * a map under a thousand entries is one request. Used for the live stats strip.
+ * A failed read throws, so the caller can show "–" rather than a zero.
+ */
+export async function countEntries(pallet, entry, urls = PEOPLE_RPCS) {
+  const prefix = "0x" + twox128(pallet) + twox128(entry);
+  let total = 0;
+  for (let start = null; ; ) {
+    const page = await rpc("state_getKeysPaged", [prefix, 1000, start], urls);
+    if (!page?.length) break;
+    total += page.length;
+    if (page.length < 1000) break;
+    start = page[page.length - 1];
+  }
+  return total;
+}
+
 /** PeopleLite.AccountToAlias — presence means an alias is bound for this account. */
 export async function accountToAlias(publicKey, urls = PEOPLE_RPCS) {
   return await getStorage("PeopleLite", "AccountToAlias", publicKey, urls);
@@ -279,16 +317,29 @@ let usernameCache = null;
  * the *unhashed* key to the storage key — so the username itself is readable
  * straight out of the key list, no extra lookup needed.
  *
- * A few hundred entries on the devnet, so this is cheap. Cached for the session.
+ * Read every page. One page of 1000 was enough until the devnet passed 982 usernames
+ * on 2026-10-24; past that, names that hash into a later page would have come back
+ * "not registered" — a missing read shown as an answer. Cached for the session.
  */
 export async function fetchUsernames(urls = PEOPLE_RPCS) {
   if (usernameCache) return usernameCache;
 
   const prefix = "0x" + twox128("Resources") + twox128("UsernameOwnerOf");
-  const keys = await rpc("state_getKeysPaged", [prefix, 1000], urls);
-  if (!keys?.length) return (usernameCache = []);
+  const keys = [];
+  for (let start = null; ; ) {
+    const page = await rpc("state_getKeysPaged", [prefix, 1000, start], urls);
+    if (!page?.length) break;
+    keys.push(...page);
+    if (page.length < 1000) break;
+    start = page[page.length - 1];
+  }
+  if (!keys.length) return (usernameCache = []);
 
-  const [{ changes }] = await rpc("state_queryStorageAt", [keys], urls);
+  const changes = [];
+  for (let i = 0; i < keys.length; i += 500) {
+    const [set] = await rpc("state_queryStorageAt", [keys.slice(i, i + 500)], urls);
+    changes.push(...set.changes);
+  }
 
   usernameCache = changes
     .filter(([, value]) => value)
@@ -334,9 +385,9 @@ export async function resolveUsername(input, urls = PEOPLE_RPCS) {
   if (exact) return toHit(exact);
   const stem = all.filter((u) => u.username.toLowerCase().replace(/\.\d+$/, "") === q);
   if (stem.length > 1) {
-    const names = stem.map((u) => u.username).sort().join(", ");
+    const names = stem.map((u) => u.username).sort().join(" or ");
     throw new Error(
-      `"${input.trim()}" matches ${stem.length} usernames — ${names}. Type one in full, or ${q}.dot for the .dot name.`,
+      `"${input.trim()}" could be ${names}. Type one in full, or ${q}.dot for the .dot name.`,
     );
   }
   return stem.length ? toHit(stem[0]) : null;

@@ -35,8 +35,13 @@ AliasAccounts.AliasFee  on the devnet Asset Hub  →  unset
 
 Since runtime v2.5 the fee is no longer pallet storage: it is a root-only runtime
 parameter (`Parameters`, key `AliasAccounts::AliasFee`) that defaults to `None` —
-and still unset **[T]** 2026-10-05. The Asset Hub runtime's own source now notes
-it has never been set on Paseo **[S]**. Same block, new home.
+still unset on 2026-10-05 **[T]**. The Asset Hub runtime's own source noted it had
+never been set on Paseo **[S]**.
+
+**It was set on 2026-10-22 [T]** — `AliasFee = 1000` (PGAS base units), first present
+at Asset Hub block 14,770,710 (14:56 UTC, runtime 2005004). Since then an alias *can*
+be bound. Since 1.4.2 the app reads the fee and the number of bound aliases live,
+instead of stating either.
 
 **So no account on the devnet can bind a contextual alias at all.** Every
 personhood check on Asset Hub therefore returns `status 0`, and
@@ -55,18 +60,29 @@ carries the personhood record, never a per-app product account. One person can h
 several identity accounts — reinstalling the app creates a new one — and nothing on
 chain links them, so the card speaks for one account only.
 
-It then reports the personhood tier (None / Lite / Full), the contextual alias,
-and a diagnosis:
+**Since 2.0 the page is deliberately simple.** Each lookup answers three plain
+questions: *verified person?*, *proven to apps?* and *which .dot names?*, each as
+Yes / No / Couldn't check with one short line underneath. A name checker answers
+*can I get this .dot?*, and a live strip counts verified people, usernames and
+aliases. The technical detail (pallets, contexts, hex) is not on the page; what each
+answer is built from, and what it does and does not establish, is in this README.
 
-- **No record** — and where personhood actually binds (the account that owns the
-  username, resolved via `Resources.UsernameOwnerOf`, not the product or session
-  account)
-- **Personhood but no alias** — the exact state behind
+Under the hood the answers map to:
+
+- **Verified person**: `PeopleLite.LitePeople` on the People chain, and the
+  recognition method (`UniqueDevice` or `Fee`)
+- **Proven to apps**: the `IPersonhood` precompile in the `dotns` context, plus
+  `AccountToAlias`. "Not yet" for a registered person is the state behind a
   [`NoPersonhood`](https://github.com/Polkadot-Community-Foundation/polkadot-app-docs/issues/3)
-- **Verified with an alias** — what that permits in this context
+  revert
+- **.dot names**: the DotNS registrar count, with names confirmed one by one
 
-Plus a name checker: which personhood tier a label requires, and whether its base
-name is reserved.
+"Couldn't check" is never shown as "No". That is the one rule the simplification
+kept from the start.
+
+The page uses DM Sans and DM Serif Display, shipped inside the bundle rather than
+loaded from a font host (`src/fonts/`, SIL Open Font License 1.1, see `src/fonts/OFL.txt`).
+The design is dark only.
 
 ## How it works
 
